@@ -8,6 +8,21 @@ function debugCafeApi(message: string, details?: unknown) {
   }
 }
 
+function unwrapArrayResponse<T>(payload: unknown): T[] {
+  if (Array.isArray(payload)) return payload as T[]
+
+  if (
+    payload &&
+    typeof payload === "object" &&
+    "data" in payload &&
+    Array.isArray((payload as { data?: unknown }).data)
+  ) {
+    return (payload as { data: T[] }).data
+  }
+
+  return []
+}
+
 export const cafeQueryKeys = {
   all: ["cafes"] as const,
   list: (params?: CafeListParams) => [...cafeQueryKeys.all, "list", params ?? {}] as const,
@@ -178,8 +193,8 @@ export const adminAmenityQueryKeys = {
 
 export const trackTypeApi = {
   listAll: async (): Promise<TrackType[]> => {
-    const res = await api.get<TrackType[]>("/v1/track-types")
-    return res.data
+    const res = await api.get<unknown>("/v1/track-types")
+    return unwrapArrayResponse<TrackType>(res.data)
   },
 }
 
