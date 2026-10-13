@@ -20,6 +20,50 @@ interface PaginatedResponse<T> {
   total: number
 }
 
+type SubscriptionPlanApiPayload = Partial<SubscriptionPlan> & {
+  branch_limit?: unknown
+  ai_quota_per_month?: unknown
+  channel_limit?: unknown
+  price_per_month?: unknown
+  is_trial?: unknown
+}
+
+function toFiniteNumber(value: unknown): number {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+function normalizeSubscriptionPlans(payload: unknown): SubscriptionPlan[] {
+  const values =
+    Array.isArray(payload)
+      ? payload
+      : payload &&
+          typeof payload === "object" &&
+          "data" in payload &&
+          Array.isArray((payload as { data?: unknown }).data)
+        ? (payload as { data: unknown[] }).data
+        : []
+
+  return values.flatMap((value) => {
+    if (!value || typeof value !== "object") return []
+
+    const plan = value as SubscriptionPlanApiPayload
+    if (typeof plan.id !== "string" || typeof plan.name !== "string") return []
+
+    return [
+      {
+        id: plan.id,
+        name: plan.name as SubscriptionPlan["name"],
+        branchLimit: toFiniteNumber(plan.branchLimit ?? plan.branch_limit),
+        aiQuotaPerMonth: toFiniteNumber(plan.aiQuotaPerMonth ?? plan.ai_quota_per_month),
+        channelLimit: toFiniteNumber(plan.channelLimit ?? plan.channel_limit),
+        pricePerMonth: toFiniteNumber(plan.pricePerMonth ?? plan.price_per_month),
+        isTrial: plan.isTrial === true || plan.is_trial === true,
+      },
+    ]
+  })
+}
+
 export const subscriptionApi = {
   getSubscriptionStatus: async (): Promise<{
     success: boolean
@@ -199,8 +243,8 @@ export const subscriptionApi = {
   },
 
   listSubscriptionPlans: async (): Promise<SubscriptionPlan[]> => {
-    const res = await api.get<SubscriptionPlan[]>("/v1/subscription-plans")
-    return res.data
+    const res = await api.get<unknown>("/v1/subscription-plans")
+    return normalizeSubscriptionPlans(res.data)
   },
 
   updateSubscriptionPlan: async (
